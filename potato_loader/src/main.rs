@@ -16,8 +16,8 @@ use uefi::prelude::SystemTable;
 use uefi::table::Boot;
 use potato_loader::frame_buffer::FrameBuffer;
 
-type EntryFn = extern "sysv64" fn(&FrameBuffer);
-
+// type EntryFn = extern "sysv64" fn(&FrameBuffer);
+type EntryFn = extern "sysv64" fn(FrameBuffer);
 
 unsafe fn get_frame_buffer(system_table: &SystemTable<Boot>) -> FrameBuffer {
     let frame_buffer = FrameBuffer::from_system_table(system_table);
@@ -86,15 +86,17 @@ pub extern "efiapi" fn efi_main(
     };
 
     // read kernel file
-    use uefi::proto::loaded_image::LoadedImage;
-    let loaded_image = system_table.boot_services()
-        .handle_protocol::<LoadedImage>(image).unwrap_success()
-        .get();
-    let device = unsafe {(*loaded_image).device()};
-    let file_system = system_table.boot_services()
-        .handle_protocol::<SimpleFileSystem>(device).unwrap_success()
-        .get();
-    let mut root_dir = unsafe { (*file_system).open_volume().unwrap_success() };
+    let mut root_dir = {
+        use uefi::proto::loaded_image::LoadedImage;
+        let loaded_image = system_table.boot_services()
+            .handle_protocol::<LoadedImage>(image).unwrap_success()
+            .get();
+        let device = unsafe {(*loaded_image).device()};
+        let file_system = system_table.boot_services()
+            .handle_protocol::<SimpleFileSystem>(device).unwrap_success()
+            .get();
+        unsafe {(*file_system).open_volume().unwrap_success()}
+    };
     let kernel_file = root_dir.open(
         "potatOS.elf", 
         FileMode::Read, 
@@ -106,17 +108,16 @@ pub extern "efiapi" fn efi_main(
     let info: &mut FileInfo = kernel_file.get_info(buf).unwrap_success();
     let kernel_file_size = info.file_size() as usize;
     let kernel_file_buf: &mut [u8] = {
-        let point = system_table.boot_services()
+        let addr = system_table.boot_services()
             .allocate_pool(MemoryType::LOADER_DATA, kernel_file_size)
             .unwrap_success();
-        unsafe { core::slice::from_raw_parts_mut(point, kernel_file_size)}
+        unsafe { core::slice::from_raw_parts_mut(addr, kernel_file_size)}
     };
 
     kernel_file.read(kernel_file_buf).unwrap_success();
     kernel_file.close();
 
     // load kernel and retreive entry point
-    // let kernel_file_buf = unsafe { read_kernel_file(image, &system_table) };
     use goblin::elf;
     use core::cmp;
     let kernel_elf = elf::Elf::parse(&kernel_file_buf).unwrap();
@@ -163,7 +164,7 @@ pub extern "efiapi" fn efi_main(
 
     // test entry (before exiting boot services)
     // writeln!(system_table.stdout(), "{:?}", frame_buffer).unwrap();
-    entry_point(&frame_buffer);
+    entry_point(frame_buffer);
 
     writeln!(system_table.stdout(), "exiting boot services").unwrap();
     // exit boot services (and retreive memory_map)

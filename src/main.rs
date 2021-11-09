@@ -5,7 +5,7 @@ use core::panic::PanicInfo;
 use potatOS::frame_buffer::{FrameBuffer, PixelColor};
 
 #[no_mangle]
-pub extern "C" fn kernel_main(frame_buffer: &mut FrameBuffer) -> ! {
+pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
     // println!("Hello, world!");
     for x in 0..frame_buffer.h() {
         for y in 0..frame_buffer.v() {
