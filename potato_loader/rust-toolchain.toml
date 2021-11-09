@@ -1,0 +1,8 @@
+# rust のツールチェーン (= rustup) に関する設定
+# 
+# 
+[toolchain]
+# `rustup override nightly` の代わり
+channel = "nightly"
+# `rustup add rust-src` 等の代わり
+# components = ["rust-src", "rustfmt", "clippy"]

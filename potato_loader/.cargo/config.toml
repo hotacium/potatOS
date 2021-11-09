@@ -1,0 +1,17 @@
+[build]
+target = "x86_64-unknown-uefi"
+
+[unstable]
+build-std-features = ["compiler-builtins-mem"]
+build-std = ["core", "compiler_builtins", "alloc"]
+
+[source.crates-io]
+registry = "https://github.com/rust-lang/crates.io-index"
+replace-with = 'ustc'
+
+[source.ustc]
+registry = "git://mirrors.ustc.edu.cn/crates.io-index"
+
+[target.x86_64-unknown-uefi]
+runner = "sh run-qemu.sh"
+
