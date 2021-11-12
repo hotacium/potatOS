@@ -2,7 +2,11 @@
 #![no_main]
 
 use core::panic::PanicInfo;
-use potatOS::frame_buffer::{FrameBuffer, PixelColor};
+use potatOS::frame_buffer::{
+    FrameBuffer, 
+    PixelColor, 
+    PixelWriter, 
+};
 
 #[no_mangle]
 pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {

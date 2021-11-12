@@ -33,25 +33,6 @@ pub struct FrameBuffer {
 }
 
 impl FrameBuffer {
-    pub fn draw_pixel(&self, x: usize, y: usize, color: &PixelColor) {
-        let pixel_position = self.pixel_per_scan_line * y + x;
-        match self.pixel_format {
-            PixelFormat::PixelRGBResv8BitPerColor => {
-                let pixel = unsafe { self.frame_buffer.add(4*pixel_position) };
-                let color_data = [color.red, color.green, color.blue];
-                for (i, &item) in color_data.iter().enumerate() {
-                    unsafe { pixel.add(i).write_volatile(item) };
-                }
-            },
-            PixelFormat::PixelBGRResv8BitPerColor => {
-                let pixel = unsafe { self.frame_buffer.add(4*pixel_position) };
-                let color_data = [color.blue, color.green, color.red];
-                for (i, &item) in color_data.iter().enumerate() {
-                    unsafe { pixel.add(i).write_volatile(item) };
-                }
-            },
-        }
-    }
 
     pub fn h(&self) -> usize {
         self.horizontal_resolution
@@ -61,4 +42,71 @@ impl FrameBuffer {
         self.vertical_resolution
     }
 
+    pub fn pixel_format(&self) -> &PixelFormat {
+        &self.pixel_format
+    }
+
 }
+
+impl PixelWriter for FrameBuffer {
+    fn draw_pixel(&self, x: usize, y: usize, color: &PixelColor) {
+        let pixel_position = self.pixel_per_scan_line * y + x;
+        let color_data = match self.pixel_format {
+            PixelFormat::PixelRGBResv8BitPerColor => [color.red, color.green, color.blue],
+            PixelFormat::PixelBGRResv8BitPerColor => [color.blue, color.green, color.red],
+        };
+        let pixel = unsafe { self.frame_buffer.add(4*pixel_position) };
+        for (i, &item) in color_data.iter().enumerate() {
+            unsafe { pixel.add(i).write_volatile(item) };
+        }
+    }
+}
+
+pub trait PixelWriter {
+    // fn new(frame_buffer: FrameBuffer) -> Self;
+    fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor); 
+}
+
+pub struct RGBResv8BitPerColorPixelWriter {
+    frame_buffer: FrameBuffer
+}
+
+impl RGBResv8BitPerColorPixelWriter {
+    pub fn new(frame_buffer: FrameBuffer) -> Self {
+        Self { frame_buffer }
+    }
+}
+
+impl PixelWriter for RGBResv8BitPerColorPixelWriter {
+    fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor) {
+        let pixel_position = self.frame_buffer.pixel_per_scan_line * y + x;
+        let pixel = unsafe { self.frame_buffer.frame_buffer.add(4*pixel_position) };
+        let color_data = [color.red, color.green, color.blue];
+        for (i, &item) in color_data.iter().enumerate() {
+            unsafe { pixel.add(i).write_volatile(item) };
+        }
+    }
+}
+
+pub struct BGRResv8BitPerColorPixelWriter {
+    frame_buffer: FrameBuffer
+}
+
+impl BGRResv8BitPerColorPixelWriter {
+    pub fn new(frame_buffer: FrameBuffer) -> Self {
+        Self { frame_buffer }
+    }
+
+}
+
+impl PixelWriter for BGRResv8BitPerColorPixelWriter {
+    fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor) {
+        let pixel_position = self.frame_buffer.pixel_per_scan_line * y + x;
+        let pixel = unsafe { self.frame_buffer.frame_buffer.add(4*pixel_position) };
+        let color_data = [color.blue, color.green, color.red];
+        for (i, &item) in color_data.iter().enumerate() {
+            unsafe { pixel.add(i).write_volatile(item) };
+        }
+    }
+}
+
