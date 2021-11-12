@@ -148,6 +148,7 @@ pub extern "efiapi" fn efi_main(
         let mut load_dest = unsafe { 
             slice::from_raw_parts_mut(pheader.p_vaddr as *mut u8, mem_size)
         };
+        // maybe optimized out?
         load_dest[..file_size].copy_from_slice(&kernel_file_buf[offset..offset+file_size]);
         load_dest[file_size..].fill(0);
     }
