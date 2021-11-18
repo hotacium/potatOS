@@ -1,6 +1,5 @@
-
-use uefi::proto::console::gop::PixelFormat as UEFIPixelFormat;
 use core::slice;
+use uefi::proto::console::gop::PixelFormat as UEFIPixelFormat;
 
 #[derive(Debug)]
 #[repr(u8)]
@@ -19,16 +18,18 @@ pub struct FrameBuffer {
     pixel_format: PixelFormat,
 }
 
-use uefi::prelude::{SystemTable, Boot, ResultExt};
+use uefi::prelude::{Boot, ResultExt, SystemTable};
 
 impl FrameBuffer {
     pub fn from_system_table(system_table: &SystemTable<Boot>) -> Self {
         use uefi::proto::console::gop::GraphicsOutput;
-        let protocol = system_table.boot_services()
-            .locate_protocol::<GraphicsOutput>().unwrap_success(); 
-        let gop = unsafe { &mut *protocol.get() }; 
-        
-        // frame buffer 
+        let protocol = system_table
+            .boot_services()
+            .locate_protocol::<GraphicsOutput>()
+            .unwrap_success();
+        let gop = unsafe { &mut *protocol.get() };
+
+        // frame buffer
         let frame_buffer_ptr = gop.frame_buffer().as_mut_ptr();
 
         let mode_info = gop.current_mode_info();
@@ -38,12 +39,8 @@ impl FrameBuffer {
         let resolution = mode_info.resolution();
         // pixel format
         let pixel_format = match mode_info.pixel_format() {
-            UEFIPixelFormat::Rgb => {
-                PixelFormat::PixelRGBResv8BitPerColor
-            },
-            UEFIPixelFormat::Bgr => {
-                PixelFormat::PixelBGRResv8BitPerColor
-            },
+            UEFIPixelFormat::Rgb => PixelFormat::PixelRGBResv8BitPerColor,
+            UEFIPixelFormat::Bgr => PixelFormat::PixelBGRResv8BitPerColor,
             UEFIPixelFormat::Bitmask => panic!("unexpected PixelFormat::Bitmask"),
             UEFIPixelFormat::BltOnly => panic!("unexpected PixelFormat::BltOnly"),
         };
@@ -57,10 +54,3 @@ impl FrameBuffer {
         }
     }
 }
-
-
-
-
-
-
-
