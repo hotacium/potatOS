@@ -1,0 +1,52 @@
+[env]
+BOOTLOADER_EFI_PATH = "target/x86_64-unknown-uefi/debug/potato_loader.efi"
+KERNEL_ELF_PATH = "target/kernel_target/debug/potatOS.elf"
+DISK_PATH = "./disk.img"
+
+[config]
+default_to_workspace = false
+
+[tasks.build-image]
+dependencies = ["build-kernel", "build-bootloader"]
+script = '''
+MNT=./mnt
+
+qemu-img create -f raw ${DISK_PATH} 200M
+
+mkfs.fat -n 'POTATO OS' -s 2 -f 2 -R 32 -F 32 ${DISK_PATH}
+
+mkdir -p $MNT
+sudo mount -o loop ${DISK_PATH} $MNT
+
+sudo mkdir -p $MNT/EFI/BOOT
+sudo cp ${BOOTLOADER_EFI_PATH} $MNT/EFI/BOOT/BOOTX64.EFI
+sudo cp ${KERNEL_ELF_PATH} $MNT/potatOS.elf
+
+sleep 0.5
+sudo umount $MNT
+'''
+
+[tasks.build-kernel]
+command = "cargo"
+args = ["build"]
+
+[tasks.build-bootloader]
+dependencies = [
+    { name = "build", path = "potato_loader" }
+]
+
+[tasks.run]
+description = "Build bootable image and then run it on QEMU"
+dependencies = ["build-image"]
+script = '''
+qemu-system-x86_64 -bios OVMF.fd -drive format=raw,file=${DISK_PATH}
+'''
+
+[tasks.debug]
+description = "Run built image on QEMU and run Rust-GDB"
+dependencies = ["build-image"]
+script = '''
+qemu-system-x86_64 -bios OVMF.fd -drive format=raw,file=${DISK_PATH} -s -S &
+rust-gdb ${KERNEL_ELF_PATH} -ex "target remote :1234"
+'''
+
