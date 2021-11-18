@@ -30,6 +30,7 @@ runner = "sh run-qemu.sh target/x86_64-unknown-uefi/debug/potato_loader.efi targ
 
 
 
+
 [source.crates-io]
 registry = "https://github.com/rust-lang/crates.io-index"
 replace-with = 'ustc'

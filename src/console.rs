@@ -122,7 +122,7 @@ macro_rules! kprintln {
 pub static CONSOLE: SpinMutex<Console> = SpinMutex::new(
     Console::new()
 );
-// need init in kernel_main
+// need init CONSOLE_WRITER in kernel_main
 pub static CONSOLE_WRITER: SpinMutex<FrameBuffer> = SpinMutex::new(
     FrameBuffer::uninitialized_default()
 );

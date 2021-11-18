@@ -25,7 +25,7 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
     // init
     CONSOLE_WRITER.lock().init(frame_buffer);
 
-    kprintln!("Hello, world!");
+    kprintln!("Welcome to potatOS!");
     kprintln!("1+2={:?}", 1+2);
 
     loop {}

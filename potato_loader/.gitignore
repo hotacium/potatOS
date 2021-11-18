@@ -1,0 +1,5 @@
+/target
+/var
+/mnt
+disk.img
+Cargo.lock
