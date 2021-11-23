@@ -122,18 +122,15 @@ macro_rules! kprintln {
 pub static CONSOLE: SpinMutex<Console> = SpinMutex::new(
     Console::new()
 );
-// need init CONSOLE_WRITER in kernel_main
-pub static CONSOLE_WRITER: SpinMutex<FrameBuffer> = SpinMutex::new(
-    FrameBuffer::uninitialized_default()
-);
 
 pub static CONSOLE_FONT: ShinonomeFont = ShinonomeFont::new();
 
 
+use crate::graphics::WRITER;
 pub fn _kprint(args: fmt::Arguments) {
     use core::fmt::Write;
     let mut console = CONSOLE.lock();
-    let writer = CONSOLE_WRITER.lock();
+    let writer = WRITER.lock();
     console.write_fmt(args).unwrap();
     console.render(&writer, &CONSOLE_FONT);
 }

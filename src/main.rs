@@ -7,9 +7,7 @@ use potatOS::graphics::{
     FrameBuffer, 
     PixelColor, 
     PixelWriter, 
-};
-use potatOS::console::{
-    CONSOLE_WRITER,
+    WRITER,
 };
 use potatOS::{
     kprintln
@@ -23,13 +21,15 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
         }
     }
     // init
-    CONSOLE_WRITER.lock().init(frame_buffer);
+    WRITER.lock().init(frame_buffer);
 
     kprintln!("Welcome to potatOS!");
     kprintln!("1+2={:?}", 1+2);
 
     loop {}
 }
+
+
 
 
 // TODO: write another panic function for release build

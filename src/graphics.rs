@@ -30,6 +30,13 @@ pub enum PixelFormat {
 }
 
 
+// need init CONSOLE_WRITER in kernel_main
+use crate::console::SpinMutex;
+pub static WRITER: SpinMutex<FrameBuffer> = SpinMutex::new(
+    FrameBuffer::uninitialized_default()
+);
+
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct FrameBuffer {
@@ -85,6 +92,19 @@ impl PixelWriter for FrameBuffer {
 pub trait PixelWriter {
     // fn new(frame_buffer: FrameBuffer) -> Self;
     fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor);
+
+    fn fill_rect(
+        &self,
+        pos: Vector2D<usize>, 
+        size: Vector2D<usize>, 
+        color: &PixelColor
+    ) {
+        for dy in 0..size.y() {
+            for dx in 0..size.x() {
+                self.draw_pixel(pos.x() + dx, pos.y() + dy, color)
+            }
+        }
+    }
 }
 
 pub struct RGBResv8BitPerColorPixelWriter {
@@ -195,3 +215,26 @@ impl ShinonomeFont {
         }
     }
 }
+
+
+pub struct Vector2D<T: Ord + Copy> {
+    x: T, 
+    y: T,
+}
+
+impl<T: Ord + Copy> Vector2D<T> {
+    pub fn x(&self) -> T {
+        self.x
+    }
+
+    pub fn y(&self) -> T {
+        self.y
+    }
+}
+
+
+
+
+
+
+
