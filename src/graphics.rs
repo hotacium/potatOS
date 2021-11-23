@@ -193,22 +193,6 @@ impl ShinonomeFont {
         }
     }
 
-    // pub fn write_ascii(&self, writer: &FrameBuffer, x: usize, y: usize, c: char, color: &PixelColor) {
-    //     let index = 16*c as usize;
-    //     // if c is not ascii char
-    //     if index >= self.font.len() {
-    //         return
-    //     }
-    //     for dy in 0..16 {
-    //         for dx in 0..8 {
-    //             if ((self.font[index+dy] << dx) & 0x80) > 0 {
-    //                 writer.draw_pixel(x+dx, y+dy, color);
-    //             }
-    //         }
-    //     }
-
-    // }
-
     pub fn write_string(&self, writer: &FrameBuffer, x: usize, y: usize, s: &str, color: &PixelColor) {
         for (i, c) in s.chars().enumerate() {
             self.write_ascii(writer, i*8 + x, y, c, color);
