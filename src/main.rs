@@ -35,6 +35,7 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
             let line = {
                 let chars = MOUSE_CURSOR_SHAPE[dy].chars();
                 let mut line: [char; MOUSE_CURSOR_WIDTH] = [' '; MOUSE_CURSOR_WIDTH];
+                assert_eq!(MOUSE_CURSOR_WIDTH, MOUSE_CURSOR_SHAPE[dy].len());
                 chars.enumerate().for_each(|(i, c)| {
                     line[i] = c;
                 });
