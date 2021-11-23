@@ -13,6 +13,15 @@ impl PixelColor {
     pub const WHITE: Self = Self {
         red: 255, green: 255, blue: 255,
     };
+    pub const RED: Self = Self {
+        red: 255, green: 0, blue: 0,
+    };
+    pub const GREEN: Self = Self {
+        red: 0, green: 255, blue: 0,
+    };
+    pub const BLUE: Self = Self {
+        red: 0, green: 0, blue: 255,
+    };
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self {
             red: r,
@@ -93,16 +102,22 @@ pub trait PixelWriter {
     // fn new(frame_buffer: FrameBuffer) -> Self;
     fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor);
 
-    fn fill_rect(
-        &self,
-        pos: Vector2D<usize>, 
-        size: Vector2D<usize>, 
-        color: &PixelColor
-    ) {
+    fn fill_rect(&self, pos: Vector2D<usize>, size: Vector2D<usize>, color: &PixelColor) {
         for dy in 0..size.y() {
             for dx in 0..size.x() {
                 self.draw_pixel(pos.x() + dx, pos.y() + dy, color)
             }
+        }
+    }
+
+    fn draw_rect(&self, pos: Vector2D<usize>, size: Vector2D<usize>, color: &PixelColor) {
+        for dx in 0..size.x() {
+            self.draw_pixel(pos.x()+dx, pos.y(), color);
+            self.draw_pixel(pos.x()+dx, pos.y()+size.y(), color);
+        }
+        for dy in 0..size.y() {
+            self.draw_pixel(pos.x(), pos.y()+dy, color);
+            self.draw_pixel(pos.x()+size.x(), pos.y()+dy, color);
         }
     }
 }
@@ -207,6 +222,10 @@ pub struct Vector2D<T: Ord + Copy> {
 }
 
 impl<T: Ord + Copy> Vector2D<T> {
+    pub fn new(x: T, y: T) -> Self {
+        Self { x, y }
+    }
+
     pub fn x(&self) -> T {
         self.x
     }

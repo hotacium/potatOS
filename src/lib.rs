@@ -3,3 +3,4 @@
 
 pub mod graphics;
 pub mod console;
+pub mod mouse;
