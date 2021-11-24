@@ -21,7 +21,7 @@ use potatOS::mouse::{
 };
 
 #[no_mangle]
-pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数が参照にする (?) 8 byte を超える値は参照渡しにすべき
+pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数を参照にする. 8 byte を超える値は参照渡しにすべき.
     for x in 0..frame_buffer.h() {
         for y in 0..frame_buffer.v() {
             frame_buffer.draw_pixel(x, y, &PixelColor::new(255, 255, 255))
