@@ -31,34 +31,18 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
     {  
         let writer = WRITER.lock();
         for dy in 0..MOUSE_CURSOR_SHAPE.len() {
-            // cast &str to [char; _] 
-            let line = {
-                let chars = MOUSE_CURSOR_SHAPE[dy].chars();
-                let mut line: [char; MOUSE_CURSOR_WIDTH] = [' '; MOUSE_CURSOR_WIDTH];
-                assert_eq!(MOUSE_CURSOR_WIDTH, MOUSE_CURSOR_SHAPE[dy].len());
-                chars.enumerate().for_each(|(i, c)| {
-                    line[i] = c;
-                });
-                line
-            };
-            for dx in 0..line.len() {
-                match line[dx] {
-                    '@' => {
-                        writer.draw_pixel(200+dx, 100+dy, &PixelColor::BLACK)
+            MOUSE_CURSOR_SHAPE[dy].chars()
+                .enumerate()
+                .for_each(|(dx, c)| {
+                    match c {
+                        '@' => writer.draw_pixel(200+dx, 100+dy, &PixelColor::BLACK),
+                        '.' => writer.draw_pixel(200+dx, 100+dy, &PixelColor::WHITE),
+                        ' ' => {},
+                        c => panic!("Unexpected cursor shape: {}", c),
                     }
-                    '.' => {
-                        writer.draw_pixel(200+dx, 100+dy, &PixelColor::WHITE);
-                    }
-                    ' ' => {},
-                    c => {
-                        // DEBUG
-                        // writer.draw_pixel(200+dx, 100+dy, &PixelColor::RED);
-                        panic!("Unexpected cursor shape: {}", c);
-                    }
-                }
-            }
+            });
         }
-    }
+    } // unlock WRITER.lock()
 
     kprintln!("Welcome to potatOS!");
     kprintln!("1+2={:?}", 1+2);
