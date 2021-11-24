@@ -32,7 +32,7 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数�
     use core::mem::MaybeUninit;
     WRITER.lock().write(match frame_buffer.pixel_format() {
         PixelFormat::PixelRGBResv8BitPerColor => {
-            // use placement-new-like way instead of heap allocation
+            // placement new
             static mut RGB_WRITER: MaybeUninit<RGBResv8BitPerColorPixelWriter> = MaybeUninit::uninit();
             unsafe { RGB_WRITER.write(RGBResv8BitPerColorPixelWriter::new(frame_buffer)); }
             unsafe { RGB_WRITER.assume_init_ref() }
