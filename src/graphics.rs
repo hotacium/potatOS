@@ -41,8 +41,9 @@ pub enum PixelFormat {
 
 // need init CONSOLE_WRITER in kernel_main
 use crate::console::SpinMutex;
-pub static WRITER: SpinMutex<FrameBuffer> = SpinMutex::new(
-    FrameBuffer::uninitialized_default()
+use core::mem::MaybeUninit;
+pub static WRITER: SpinMutex<MaybeUninit<&dyn PixelWriter>> = SpinMutex::new(
+    MaybeUninit::<&dyn PixelWriter>::uninit()
 );
 
 
@@ -65,9 +66,6 @@ impl FrameBuffer {
             vertical_resolution: 0,
             pixel_format: PixelFormat::PixelRGBResv8BitPerColor,
         }
-    }
-    pub fn init(&mut self, fb: Self) {
-        let _old_self = core::mem::replace(self, fb);
     }
 
     pub fn h(&self) -> usize {
@@ -100,6 +98,10 @@ impl PixelWriter for FrameBuffer {
 
 pub trait PixelWriter {
     // fn new(frame_buffer: FrameBuffer) -> Self;
+    // fn init(&mut self, fb: Self) {
+    //     let _old_self = core::mem::replace(self, fb);
+    // }
+
     fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor);
 
     fn fill_rect(&self, pos: Vector2D<usize>, size: Vector2D<usize>, color: &PixelColor) {
@@ -167,8 +169,8 @@ impl PixelWriter for BGRResv8BitPerColorPixelWriter {
 
 pub trait Font {
     fn char_size(&self) -> (usize, usize);
-    fn write_ascii(&self, writer: &FrameBuffer, x: usize, y: usize, c: char, color: &PixelColor); 
-    fn write_string(&self, writer: &FrameBuffer, x: usize, y: usize, s: &str, color: &PixelColor) {
+    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, color: &PixelColor); 
+    fn write_string(&self, writer: &dyn PixelWriter, x: usize, y: usize, s: &str, color: &PixelColor) {
         for (i, c) in s.chars().enumerate() {
             self.write_ascii(writer, i*8 + x, y, c, color);
         }
@@ -183,7 +185,7 @@ impl Font for ShinonomeFont {
     fn char_size(&self) -> (usize, usize) {
         (8+2, 16+2)
     }
-    fn write_ascii(&self, writer: &FrameBuffer, x: usize, y: usize, c: char, color: &PixelColor) {
+    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, color: &PixelColor) {
         let index = 16*c as usize;
         // if c is not ascii char
         if index >= self.font.len() {

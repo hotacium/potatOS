@@ -6,8 +6,11 @@ use core::panic::PanicInfo;
 use potatOS::graphics::{
     FrameBuffer, 
     PixelColor, 
-    PixelWriter, 
+    PixelWriter,
+    PixelFormat, 
     WRITER,
+    RGBResv8BitPerColorPixelWriter,
+    BGRResv8BitPerColorPixelWriter,
 };
 use potatOS::{
     kprintln
@@ -18,18 +21,34 @@ use potatOS::mouse::{
 };
 
 #[no_mangle]
-pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
+pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数が参照にする (?) 8 byte を超える値は参照渡しにすべき
     for x in 0..frame_buffer.h() {
         for y in 0..frame_buffer.v() {
             frame_buffer.draw_pixel(x, y, &PixelColor::new(255, 255, 255))
         }
     }
-    // init
-    WRITER.lock().init(frame_buffer);
+    
+    // init 
+    use core::mem::MaybeUninit;
+    WRITER.lock().write(match frame_buffer.pixel_format() {
+        PixelFormat::PixelRGBResv8BitPerColor => {
+            // use placement-new-like way instead of heap allocation
+            static mut RGB_WRITER: MaybeUninit<RGBResv8BitPerColorPixelWriter> = MaybeUninit::uninit();
+            unsafe { RGB_WRITER.write(RGBResv8BitPerColorPixelWriter::new(frame_buffer)); }
+            unsafe { RGB_WRITER.assume_init_ref() }
+        },
+        PixelFormat::PixelBGRResv8BitPerColor => {
+            static mut BGR_WRITER: MaybeUninit<BGRResv8BitPerColorPixelWriter> = MaybeUninit::uninit();
+            unsafe { BGR_WRITER.write(BGRResv8BitPerColorPixelWriter::new(frame_buffer)); }
+            unsafe { BGR_WRITER.assume_init_ref() }
+        },
+    });
+
+    // WRITER.lock().init(frame_buffer);
     // to avoid deadlock between `writer` and `println!`
     // (both of them use same static WRITER with spinlock)
     {  
-        let writer = WRITER.lock();
+        let writer = unsafe { WRITER.lock().assume_init() };
         for dy in 0..MOUSE_CURSOR_SHAPE.len() {
             MOUSE_CURSOR_SHAPE[dy].chars()
                 .enumerate()
@@ -37,7 +56,7 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! {
                     match c {
                         '@' => writer.draw_pixel(200+dx, 100+dy, &PixelColor::BLACK),
                         '.' => writer.draw_pixel(200+dx, 100+dy, &PixelColor::WHITE),
-                        ' ' => {},
+                        ' ' => { /* do nothing */ },
                         c => panic!("Unexpected cursor shape: {}", c),
                     }
             });

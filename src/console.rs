@@ -46,6 +46,7 @@ pub struct Console {
 const ROWS: usize = 25;
 const COLUMNS: usize =  80;
 
+use crate::graphics::PixelWriter;
 impl Console {
     pub const fn new() -> Self {
         Self {
@@ -57,7 +58,7 @@ impl Console {
         }
     }
 
-    pub fn render(&mut self, writer: &FrameBuffer, font: &dyn Font) {
+    pub fn render(&mut self, writer: &dyn PixelWriter, font: &dyn Font) {
         let (font_x, font_y) = font.char_size();
         for y in 0..self.rows {
             for x in 0..self.columns {
@@ -131,8 +132,9 @@ pub fn _kprint(args: fmt::Arguments) {
     use core::fmt::Write;
     let mut console = CONSOLE.lock();
     let writer = WRITER.lock();
+    let writer = unsafe { writer.assume_init() };
     console.write_fmt(args).unwrap();
-    console.render(&writer, &CONSOLE_FONT);
+    console.render(writer, &CONSOLE_FONT);
 }
 
 // ------------------------------------------------------
