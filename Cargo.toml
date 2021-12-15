@@ -2,12 +2,14 @@
 name = "potatOS"
 version = "0.1.0"
 edition = "2018"
+resolver = "2"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+mikanos_usb = { path = "./mikanos_usb/" }
 
 [workspace]
 members = [
-    "potato_loader"
+    "potato_loader",
 ]

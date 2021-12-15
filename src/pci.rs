@@ -26,66 +26,58 @@ impl Config {
 
     pub fn read_vendor_id(&self) -> u16 {
         unsafe { 
-            self.write_config_addr(self.make_address(0));
-            self.read_config_data()
+            write_config_addr(self.make_address(0));
+            read_config_data()
                 .get_bits(0..16) as u16
         }
     }
 
     pub fn read_device_id(&self) -> u16 {
         unsafe {
-            self.write_config_addr(self.make_address(0));
-            self.read_config_data()
+            write_config_addr(self.make_address(0));
+            read_config_data()
                 .get_bits(16..32) as u16
         }
     }
 
     pub fn read_class_code(&self) -> (u8, u8, u8, u8) {
         let class_code = unsafe {
-            self.write_config_addr(self.make_address(2));
-            self.read_config_data()
+            write_config_addr(self.make_address(2));
+            read_config_data()
         };
         (
-            class_code.get_bits(0..8) as u8,
-            class_code.get_bits(8..16) as u8,
-            class_code.get_bits(16..24) as u8,
             class_code.get_bits(24..32) as u8,
+            class_code.get_bits(16..24) as u8,
+            class_code.get_bits(8..16) as u8,
+            class_code.get_bits(0..8) as u8,
         )
     }
 
     pub fn read_header_type(&self) -> u8 {
         unsafe {
-            self.write_config_addr(self.make_address(3));
-            self.read_config_data()
+            write_config_addr(self.make_address(3));
+            read_config_data()
                 .get_bits(16..24) as u8
         }
     }
 
     pub fn read_bus_number(&self) -> u32 {
         unsafe {
-            self.write_config_addr(self.make_address(6));
-            self.read_config_data()
+            write_config_addr(self.make_address(6));
+            read_config_data()
         }
     }
 
-    unsafe fn write_config_addr(&self, addr: u32) {
-        let mut port = IOPort::new(CONFIG_ADDRESS);
-        port.write32(addr);
-    }
-    unsafe fn write_config_data(&self, data: u32) {
-        let mut port = IOPort::new(CONFIG_DATA);
-        port.write32(data);
-    }
-    unsafe fn read_config_data(&self) -> u32 {
-        let mut port = IOPort::new(CONFIG_DATA);
-        port.read32()
-    }
 }
 
 
 use crate::fixed_vec::FixedVec;
 const MAX_DEVICES_NUM: usize = 32;
-static mut DEVICES: FixedVec<Device, MAX_DEVICES_NUM> = FixedVec::new();
+pub static mut DEVICES: FixedVec<Device, MAX_DEVICES_NUM> = FixedVec::new();
+
+pub fn devices() -> &'static [Device] {
+    unsafe { DEVICES.as_slice() }
+}
 
 pub struct Device {
     bus: u8,
@@ -106,6 +98,74 @@ impl From<Config> for Device {
             header_type: config.read_header_type()
         }
     }
+}
+
+use core::fmt;
+impl fmt::Debug for Device {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let vendor_id = self.as_config().read_vendor_id();
+        let (base, sub, iface, rev_id) = self.as_config().read_class_code();
+        let class_code = *0u32
+                .set_bits(24..32, base as u32)
+                .set_bits(16..24, sub as u32)
+                .set_bits(8..16, iface as u32)
+                .set_bits(0..8, rev_id as u32);
+        write!(f, 
+            "{}.{}.{}: vendor {:x}, class: {:x}, head: {:x}", 
+            self.bus, self.device, self.function, vendor_id, class_code, self.header_type
+        )
+    }
+}
+
+impl Device {
+    pub fn as_config(&self) -> Config {
+        Config {
+            bus: self.bus,
+            device: self.device,
+            function: self.function,
+        }
+    }
+
+    pub fn read_register(&self, reg_idx: u8) -> u32 {
+        write_config_addr(self.as_config().make_address(reg_idx));
+        read_config_data()
+    }
+
+    pub fn write_register(&self, reg_idx: u8, val: u32) {
+        write_config_addr(self.as_config().make_address(reg_idx));
+        write_config_data(val);
+    }
+
+    pub fn read_bar(&self, bar_idx: u8) -> Option<u64> {
+        if bar_idx >= 6 {
+            return None;
+        }
+
+        const BAR_OFFSET: u8 = 4;
+        let bar_lower = self.read_register(BAR_OFFSET+bar_idx) as u64;
+
+        if bar_idx >= 5 {
+            return None;
+        }
+
+        let bar_upper = self.read_register(BAR_OFFSET + bar_idx + 1) as u64;
+
+        let bar = bar_upper << 32 | bar_lower;
+        Some(bar)
+    }
+}
+
+pub fn write_config_addr(addr: u32) {
+    let mut port = unsafe { IOPort::new(CONFIG_ADDRESS) };
+    port.write32(addr);
+}
+pub fn write_config_data(data: u32) {
+    let mut port = unsafe { IOPort::new(CONFIG_DATA) };
+    port.write32(data);
+}
+pub fn read_config_data() -> u32 {
+    let mut port = unsafe { IOPort::new(CONFIG_DATA) };
+    port.read32()
 }
 
 fn is_single_function_device(header_type: u8) -> bool {
@@ -154,7 +214,7 @@ fn scan_bus(config: Config) -> Result<()> {
         }
         scan_device(dev)?;
     }
-    todo!()
+    Ok(())
 }
 
 fn scan_device(mut config: Config) -> Result<()> {

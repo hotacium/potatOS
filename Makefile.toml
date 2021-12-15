@@ -2,6 +2,7 @@
 BOOTLOADER_EFI_PATH = "target/x86_64-unknown-uefi/debug/potato_loader.efi"
 KERNEL_ELF_PATH = "target/kernel_target/debug/potatOS.elf"
 DISK_PATH = "./disk.img"
+OVMF_PATH = "/usr/share/OVMF/x64/OVMF.fd"
 
 [config]
 default_to_workspace = false
@@ -39,14 +40,25 @@ dependencies = [
 description = "Build bootable image and then run it on QEMU"
 dependencies = ["build-image"]
 script = '''
-qemu-system-x86_64 -bios OVMF.fd -drive format=raw,file=${DISK_PATH}
+qemu-system-x86_64 -bios ${OVMF_PATH} -s -S \
+  -m 1G \
+  -drive format=raw,file=${DISK_PATH} \
+  -device nec-usb-xhci,id=xhci \
+  -device usb-mouse -device usb-kbd \
+  -no-reboot
 '''
 
 [tasks.debug]
 description = "Run built image on QEMU and run Rust-GDB"
 dependencies = ["build-image"]
 script = '''
-qemu-system-x86_64 -bios OVMF.fd -drive format=raw,file=${DISK_PATH} -s -S &
-rust-gdb ${KERNEL_ELF_PATH} -ex "target remote :1234"
+qemu-system-x86_64 -bios ${OVMF_PATH} \
+  -m 1G \
+  -drive format=raw,file=${DISK_PATH} -s -S \
+  -device qemu-xhci,id=xhci \
+  -device usb-mouse -device usb-kbd \
+& rust-gdb ${KERNEL_ELF_PATH} -ex "target remote :1234" \
+  -ex "" -ex "b main.rs:107" \
+  -ex "c" 
 '''
 

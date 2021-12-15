@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(asm)]
+#![feature(core_intrinsics)]
 
 use core::panic::PanicInfo;
 use potatOS::graphics::{
@@ -12,13 +13,14 @@ use potatOS::graphics::{
     RGBResv8BitPerColorPixelWriter,
     BGRResv8BitPerColorPixelWriter,
 };
-use potatOS::{
-    kprintln
+use potatOS::kprintln;
+use potatOS::mouse::MOUSE_CURSOR_SHAPE;
+use potatOS::pci::{
+    self,
+    scan_all_bus,
+    Device,
 };
-use potatOS::mouse::{
-    MOUSE_CURSOR_SHAPE,
-    MOUSE_CURSOR_WIDTH,
-};
+use mikanos_usb as usb;
 
 #[no_mangle]
 pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数を参照にする. 8 byte を超える値は参照渡しにすべき.
@@ -43,6 +45,7 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数�
             unsafe { BGR_WRITER.assume_init_ref() }
         },
     });
+    
 
     // WRITER.lock().init(frame_buffer);
     // to avoid deadlock between `writer` and `println!`
@@ -62,24 +65,73 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数�
             });
         }
     } // unlock WRITER.lock()
+    
+    scan_all_bus().unwrap();
+    for device in pci::devices() {
+        kprintln!("{:?}", device);
+    }
+
+    let mut xhc_dev: Option<&pci::Device> = None;
+    for device in pci::devices() {
+        let config = device.as_config();
+        kprintln!("{:?}", config.read_class_code());
+        if let (0x0c, 0x03, 0x30, _) = config.read_class_code() {
+            xhc_dev = Some(device);
+            
+            if config.read_vendor_id() == 0x8086 {
+                break
+            }
+        }
+    }
+    
+    if let Some(device) = xhc_dev {
+        let xhc_bar = device.read_bar(0);
+        let mmio_base = (xhc_bar.unwrap() & !0x0f) as u64;
+
+        let controller = unsafe { mikanos_usb::xhci::Controller::new(mmio_base) };
+
+        if device.as_config().read_vendor_id() == 0x8086 {
+            switch_echi_to_xhci(pci::devices(), device);
+        }
+
+        controller.init();
+        // controller.run().unwrap();
+
+        // usb::HidMouseDriver::set_default_observer()
+    }
 
     kprintln!("Welcome to potatOS!");
-    kprintln!("1+2={:?}", 1+2);
+    // kprintln!("1+2={:?}", 1+2);
 
-    loop {}
+    loop {
+        unsafe { asm!("hlt") };
+    }
 }
 
+fn switch_echi_to_xhci(devices: &[Device], xhc_dev: &Device) {
+    let has_intel_ehc = devices.iter().any(|device| {
+        let conf = device.as_config();
+        let code = conf.read_class_code();
+        (0x0c, 0x03, 0x20) == (code.0, code.1, code.2) && conf.read_vendor_id() == 0x8086
+    });
 
+    if !has_intel_ehc {
+        return;
+    }
+    let superspeed_ports = xhc_dev.read_register(0xdc);
+    xhc_dev.write_register(0xf8, superspeed_ports);
+    let ehci2xhci_ports = xhc_dev.read_register(0xd4);
+    xhc_dev.write_register(0xd0, ehci2xhci_ports);
+}
 
 
 // TODO: write another panic function for release build
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    unsafe { asm!("int3"); } // for GDB debugging // only for x86
+    // unsafe { core::intrinsics::breakpoint(); } // for GDB debugging // only for x86
     if let Some(loc) = _info.location() {
         // below is for GDB debugging
         let (_file, _line) = (loc.file(), loc.line());
-        todo!()
     }
     loop {}
 }

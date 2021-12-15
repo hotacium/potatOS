@@ -236,10 +236,3 @@ impl<T: Ord + Copy> Vector2D<T> {
         self.y
     }
 }
-
-
-
-
-
-
-

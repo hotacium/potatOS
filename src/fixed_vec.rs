@@ -1,5 +1,6 @@
 
 use core::mem::MaybeUninit;
+use core::marker::PhantomData;
 
 #[derive(Debug)]
 pub enum FixedVecError {
@@ -10,18 +11,29 @@ pub enum FixedVecError {
 type Result<T> = core::result::Result<T, FixedVecError>;
 
 
-pub struct FixedVec<T, const CAPACITY: usize> {
-    data: MaybeUninit<[T; CAPACITY]>,
+pub struct FixedVec<'a, T, const CAPACITY: usize> {
+    data: [MaybeUninit<T>; CAPACITY],
     len: usize,
+    _phantom: &'a PhantomData<()>,
 }
 
-impl<T, const CAPACITY: usize> FixedVec<T, CAPACITY> {
+impl<'vec_lifetime, T, const CAPACITY: usize> FixedVec<'vec_lifetime, T, CAPACITY> {
     
     pub const fn new() -> Self {
         Self {
-            data: MaybeUninit::uninit(),
+            data: unsafe { MaybeUninit::uninit().assume_init() },
             len: 0,
+            _phantom: &PhantomData,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        let p = self.data.as_ptr() as *const T;
+        unsafe { core::slice::from_raw_parts(p, self.len) }
     }
 
     pub fn push(&mut self, val: T) {
@@ -58,13 +70,13 @@ impl<T, const CAPACITY: usize> FixedVec<T, CAPACITY> {
         }
     }
 
-    pub fn get(&self, idx: usize) -> &T {
+    pub fn get(&self, idx: usize) -> &'vec_lifetime T {
         unsafe {
             self.try_get(idx).unwrap()
         }
     }
 
-    pub unsafe fn try_get(&self, idx: usize) -> Result<&T> {
+    pub unsafe fn try_get(&self, idx: usize) -> Result<&'vec_lifetime T> {
         if idx < self.len {
             let ptr = (self.data.as_ptr() as *const T).add(idx);
             Ok(&*ptr)
@@ -73,13 +85,13 @@ impl<T, const CAPACITY: usize> FixedVec<T, CAPACITY> {
         }
     }
 
-    pub fn get_mut(&mut self, idx: usize) -> &mut T {
+    pub fn get_mut(&mut self, idx: usize) -> &'vec_lifetime mut T {
         unsafe {
             self.try_get_mut(idx).unwrap()
         }
     }
 
-    pub unsafe fn try_get_mut(&mut self, idx: usize) -> Result<&mut T> {
+    pub unsafe fn try_get_mut(&mut self, idx: usize) -> Result<&'vec_lifetime mut T> {
         if idx < self.len {
             let ptr = (self.data.as_mut_ptr() as *mut T).add(idx);
             Ok(&mut *ptr)
@@ -88,57 +100,57 @@ impl<T, const CAPACITY: usize> FixedVec<T, CAPACITY> {
         }
     }
 
+    pub fn iter(&'vec_lifetime self) -> FixedVecIter<'vec_lifetime, T, CAPACITY> {
+        FixedVecIter {
+            fixed_vec: self,
+            idx: 0,
+        }
+    }
+
+    pub fn iter_mut(&'vec_lifetime mut self) -> FixedVecIterMut<'vec_lifetime, T, CAPACITY> {
+        FixedVecIterMut {
+            fixed_vec: self,
+            idx: 0,
+        }
+    }
+
 } 
 
-// impl<T, const CAPACITY: usize> FixedVec<T, CAPACITY> {
-//     pub const fn new() -> Self {
-//         Self {
-//             buf: unsafe { MaybeUninit::uninit().assume_init() },
-//             len: 0,
-//         }
-//     }
-//     pub fn capacity(&self) -> usize {
-//         CAPACITY
-//     }
-//     pub fn len(&self) -> usize {
-//         self.len
-//     }
-// 
-//     pub fn get(&self, idx: usize) -> Option<&T> {
-//         if idx < self.len {
-//             let item = self.buf[idx];
-//             Some(unsafe { &item.assume_init() })
-//         } else {
-//             None
-//         }
-//     }
-// 
-//     pub fn get_mut(&self, idx: usize) -> Option<&mut T> {
-//         if idx < self.len {
-//             let item = &self.buf[idx];
-//             Some(unsafe { item.assume_init_mut() })
-//         } else {
-//             None
-//         }
-//     }
-// 
-//     pub fn push(&mut self, val: T) -> Option<usize> {
-//         if self.len < CAPACITY {
-//             let idx = self.len;
-//             self.buf[idx].write(val);
-//             self.len += 1;
-//             Some(idx)
-//         } else {
-//             None
-//         }
-//     }
-//     pub fn pop(&mut self) -> Option<T> {
-//         if self.len > 0 {
-//             let idx = self.len()-1;
-//             self.len -= 1;
-//             Some(unsafe { self.buf[idx].assume_init() })
-//         } else {
-//             None
-//         }
-//     }
-// }
+use core::iter::Iterator;
+
+pub struct FixedVecIter<'vec_lifetime, T, const CAPACITY: usize> {
+    fixed_vec: &'vec_lifetime FixedVec<'vec_lifetime, T, CAPACITY>,
+    idx: usize,
+}
+
+impl<'a, T, const CAPACITY: usize> Iterator for FixedVecIter<'a, T, CAPACITY> {
+    type Item = &'a T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx == self.fixed_vec.len() {
+            None
+        } else {
+            let val = unsafe { self.fixed_vec.try_get(self.idx).ok() };
+            self.idx += 1;
+            val
+        }
+    }
+}
+
+pub struct FixedVecIterMut<'vec_lifetime, T, const CAPACITY: usize> {
+    fixed_vec: &'vec_lifetime mut FixedVec<'vec_lifetime, T, CAPACITY>,
+    idx: usize,
+}
+
+
+impl<'a, T, const CAPACITY: usize> Iterator for FixedVecIterMut<'a, T, CAPACITY> {
+    type Item = &'a mut T;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx == self.fixed_vec.len() {
+            None
+        } else {
+            let val = unsafe { self.fixed_vec.try_get_mut(self.idx).ok() };
+            self.idx += 1;
+            val
+        }
+    }
+}
