@@ -139,10 +139,9 @@ pub fn _kprint(args: fmt::Arguments) {
 
 #[no_mangle]
 pub extern "C" fn usb_log(_level: i32, msg: *const u8, msg_len: i32) {
-    let s = unsafe { core::slice::from_raw_parts(msg, msg_len as usize) };
-    let s = unsafe { core::str::from_utf8_unchecked(s) };
-    // TODO: print されない
-    kprintln!("{}", s);
+    // let s = unsafe { core::slice::from_raw_parts(msg, msg_len as usize) };
+    // let s = unsafe { core::str::from_utf8_unchecked(s) };
+    // kprintln!("{}", s);
 }
 
 // ------------------------------------------------------

@@ -14,14 +14,14 @@ pub struct Config {
 use crate::bit_field::BitField;
 impl Config {
     pub fn make_address(&self, reg_addr: u8) -> u32 {
-        let address = {
-            *(0.set_bit(31, true)
-                .set_bits(16..24, self.bus as u32)
-                .set_bits(11..16, self.device as u32)
-                .set_bits(8..11, self.function as u32)
-                .set_bits(2..8, reg_addr as u32))
-        };
-        address
+        let mut value = 0;
+        value = *value.set_bit(31, true)
+            .set_bits(24..31, 0)
+            .set_bits(16..24, self.bus as u32)
+            .set_bits(11..16, self.device as u32)
+            .set_bits(8..11, self.function as u32)
+            .set_bits(2..8, reg_addr as u32);
+        value
     }
 
     pub fn read_vendor_id(&self) -> u16 {
@@ -127,12 +127,14 @@ impl Device {
     }
 
     pub fn read_register(&self, reg_idx: u8) -> u32 {
-        write_config_addr(self.as_config().make_address(reg_idx));
+        let addr = self.as_config().make_address(reg_idx);
+        write_config_addr(addr);
         read_config_data()
     }
 
     pub fn write_register(&self, reg_idx: u8, val: u32) {
-        write_config_addr(self.as_config().make_address(reg_idx));
+        let addr = self.as_config().make_address(reg_idx);
+        write_config_addr(addr);
         write_config_data(val);
     }
 
@@ -141,18 +143,27 @@ impl Device {
             return None;
         }
 
-        const BAR_OFFSET: u8 = 4;
-        let bar_lower = self.read_register(BAR_OFFSET+bar_idx) as u64;
+        // let addr = calc_bar_addr(bar_idx);
+        let addr = bar_idx + 4;
+        let bar_lower = self.read_register(addr) as u64;
+
+        if bar_lower & 0b100 == 0  {
+            return Some(bar_lower);
+        }
 
         if bar_idx >= 5 {
             return None;
         }
 
-        let bar_upper = self.read_register(BAR_OFFSET + bar_idx + 1) as u64;
+        let bar_upper = self.read_register(addr+1) as u64;
 
         let bar = bar_upper << 32 | bar_lower;
         Some(bar)
     }
+}
+
+pub fn calc_bar_addr(bar_idx: u8) -> u8 {
+    0x10 + bar_idx * 4
 }
 
 pub fn write_config_addr(addr: u32) {

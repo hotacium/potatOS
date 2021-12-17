@@ -1,7 +1,10 @@
 #![warn(unsafe_op_in_unsafe_fn)]
 #![warn(clippy::unwrap_used)]
 #![warn(clippy::expect_used)]
+#![feature(asm)]
 #![no_std]
+
+pub(crate) mod cxx_support;
 
 type MouseObserverType = extern "C" fn(buttons: u8, displacement_x: i8, displacement_y: i8);
 type KeyboardObserverType = extern "C" fn(modifier: u8, keycode: u8);

@@ -20,9 +20,9 @@ extern "C" void SetLogLevel(LogLevel level) {
 }
 
 int Log(LogLevel level, const char* format, ...) {
-  if (level > log_level) {
-    return 0;
-  }
+  // if (level > log_level) {
+  //   return 0;
+  // }
 
   va_list ap;
   int result;
@@ -33,7 +33,7 @@ int Log(LogLevel level, const char* format, ...) {
   va_end(ap);
 
   //console->PutString(s);
-  // usb_log(level, s, strlen(s));
+  usb_log(level, s, strlen(s));
   if (strlen(log_buf) + strlen(s) + 1 > 65536) {
     return 0;
   }

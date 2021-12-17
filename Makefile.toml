@@ -40,12 +40,12 @@ dependencies = [
 description = "Build bootable image and then run it on QEMU"
 dependencies = ["build-image"]
 script = '''
-qemu-system-x86_64 -bios ${OVMF_PATH} -s -S \
+qemu-system-x86_64 -bios ${OVMF_PATH} \
   -m 1G \
   -drive format=raw,file=${DISK_PATH} \
   -device nec-usb-xhci,id=xhci \
   -device usb-mouse -device usb-kbd \
-  -no-reboot
+  -monitor stdio
 '''
 
 [tasks.debug]
@@ -57,6 +57,7 @@ qemu-system-x86_64 -bios ${OVMF_PATH} \
   -drive format=raw,file=${DISK_PATH} -s -S \
   -device qemu-xhci,id=xhci \
   -device usb-mouse -device usb-kbd \
+  -monitor stdio \
 & rust-gdb ${KERNEL_ELF_PATH} -ex "target remote :1234" \
   -ex "" -ex "b main.rs:107" \
   -ex "c" 
