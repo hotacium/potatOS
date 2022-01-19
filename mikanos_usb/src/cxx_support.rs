@@ -18,7 +18,6 @@ extern "C" fn sbrk(_increment: isize) -> *const u8 {
 #[no_mangle]
 extern "C" fn _exit() -> ! {
     loop {
-        unsafe { asm!("hlt") }
     }
 }
 

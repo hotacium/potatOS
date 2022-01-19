@@ -1,4 +1,4 @@
-
+use core::arch::asm;
 type Result<T> = core::result::Result<T, ()>;
 
 const CONFIG_ADDRESS: u16 = 0x0cf8;

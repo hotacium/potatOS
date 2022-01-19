@@ -2,13 +2,15 @@
 #![no_main]
 #![feature(abi_efiapi)]
 #![feature(alloc_error_handler)]
+#![feature(asm)]
 
 use core::alloc::Layout;
 use core::fmt::Write;
 use core::panic::PanicInfo;
 use core::{mem, slice};
 use uefi::prelude::ResultExt;
-use uefi::proto::media::file::{File, FileAttribute, FileInfo, FileMode, RegularFile};
+use uefi::proto::loaded_image::LoadedImage;
+use uefi::proto::media::file::{File, FileAttribute, FileInfo, FileMode, RegularFile, FileType};
 use uefi::{
     proto::media::fs::SimpleFileSystem,
     table::boot::{MemoryDescriptor, MemoryType},
@@ -26,6 +28,17 @@ unsafe fn get_frame_buffer(system_table: &SystemTable<Boot>) -> FrameBuffer {
     frame_buffer
 }
 
+struct FileWriter(RegularFile);
+use core::fmt;
+impl fmt::Write for FileWriter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.0
+            .write(s.as_bytes())
+            .expect_success("Failed to write to file");
+        Ok(())
+    }
+}
+
 // -------------------------------------------
 // EFI_MAIN
 // -------------------------------------------
@@ -38,6 +51,16 @@ pub extern "efiapi" fn efi_main(
     let stdout = system_table.stdout();
     stdout.clear().unwrap_success();
     writeln!(stdout, "Hello Bootloader!").unwrap();
+
+    let image_base = {
+        let loaded_image = unsafe { system_table
+            .boot_services()
+            .handle_protocol::<LoadedImage>(image)
+            .unwrap_success()
+            .get().as_ref().unwrap() };
+        let (addr, _) = loaded_image.info();
+        addr as u64
+    };
 
     unsafe {
         uefi::alloc::init(system_table.boot_services());
@@ -55,29 +78,54 @@ pub extern "efiapi" fn efi_main(
     };
 
     // writeln!(system_table.stdout(), "mmap_storage").unwrap();
-    // // ------------------------------------------------------
-    // // get mmap
-    // let mmap_buf: &mut [u8] = &mut [0;1024*16];
+    // ------------------------------------------------------
+    // get mmap
+    let mmap_buf: &mut [u8] = &mut [0;1024*16];
+    assert!(system_table.boot_services().memory_map_size() < mmap_buf.len());
+    let (_map_key, desc_iter) = system_table.boot_services()
+        .memory_map(mmap_buf).unwrap_success();
     // system_table.boot_services().memory_map(mmap_buf).unwrap_success();
-    // let loaded_image = system_table
-    //     .boot_services()
-    //     .handle_protocol::<LoadedImage>(image)
-    //     .unwrap_success()
-    //     .get();
-    // let device = unsafe {(*loaded_image).device()};
-    // let file_system = system_table.boot_services().handle_protocol::<SimpleFileSystem>(device).unwrap_success().get();
-    // // writeln!(system_table.stdout(), "file_system").unwrap();
-    // let mut root_dir = unsafe { (*file_system).open_volume().unwrap_success() };
-    // use uefi::proto::media::file::{File, FileMode, FileAttribute};
-    // let mmap_file_handle = root_dir.open(
-    //     "mmap_file",
-    //     FileMode::CreateReadWrite,
-    //     FileAttribute::empty()
-    // ).unwrap_success();
-    // use uefi::proto::media::file::RegularFile;
-    // let mut mmap_file = unsafe {RegularFile::new(mmap_file_handle)};
-    // mmap_file.write(mmap_buf).unwrap_success();
-    // mmap_file.flush().unwrap_success();
+    let mut root_dir = {
+        let loaded_image = system_table
+            .boot_services()
+            .handle_protocol::<LoadedImage>(image)
+            .unwrap_success()
+            .get();
+        let device = unsafe {(*loaded_image).device()};
+        let file_system = system_table.boot_services().handle_protocol::<SimpleFileSystem>(device).unwrap_success().get();
+        unsafe { (*file_system).open_volume().unwrap_success() }
+    };
+    let mut mmap_file = {
+        use uefi::proto::media::file::{File, FileMode, FileAttribute};
+        use uefi::proto::media::file::RegularFile;
+        let mmap_file_handle = root_dir.open(
+            "mmap_file.txt",
+            FileMode::CreateReadWrite,
+            FileAttribute::empty()
+        ).unwrap_success();
+        let file = match mmap_file_handle.into_type().expect_success("Failed to into_type") {
+            FileType::Regular(file) => Some(file),
+            _ => None,
+        }.expect("Unexpected file type");
+    
+        FileWriter(file)
+    };
+    // save to file
+    writeln!(mmap_file, "Image Base: {:x}", image_base);
+    writeln!(mmap_file, "Idx, Type, Type(name), Start, NumOfPages, Attr").unwrap();
+    for (i, desc) in desc_iter.enumerate() {
+        writeln!(
+            system_table.stdout(),
+            "{}, {:x}, {:?}, {:x}, {}, {:x}",
+            i, desc.ty.0, desc.ty, desc.phys_start, desc.page_count, desc.att
+        ).unwrap();
+        writeln!(
+            mmap_file,
+            "{}, {:x}, {:?}, {:x}, {}, {:x}",
+            i, desc.ty.0, desc.ty, desc.phys_start, desc.page_count, desc.att
+        ).unwrap();
+    }
+    mmap_file.0.flush().unwrap_success();
     // ------------------------------------------------------
 
     // frame buffer
@@ -171,11 +219,11 @@ pub extern "efiapi" fn efi_main(
         unsafe { core::mem::transmute::<u64, EntryFn>(addr) }
     };
 
-    // writeln!(system_table.stdout(), "entry point: {:#x}", entry_point as u64).unwrap();
+    writeln!(system_table.stdout(), "entry point: {:#x}", entry_point as u64).unwrap();
 
     // test entry (before exiting boot services)
     // writeln!(system_table.stdout(), "{:?}", frame_buffer).unwrap();
-    entry_point(frame_buffer);
+    // entry_point(frame_buffer);
 
     writeln!(system_table.stdout(), "exiting boot services").unwrap();
     // exit boot services (and retreive memory_map)
@@ -184,7 +232,7 @@ pub extern "efiapi" fn efi_main(
         .exit_boot_services(image, mmap_storage)
         .unwrap_success();
 
-    // entry_point(frame_buffer); //
+    entry_point(frame_buffer); //
 
     loop {}
 }

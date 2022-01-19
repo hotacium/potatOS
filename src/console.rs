@@ -5,8 +5,8 @@ use crate::graphics::{
 
 #[derive(Clone, Copy)]
 struct Color {
-    fg: PixelColor,
-    bg: PixelColor,
+    pub fg: PixelColor,
+    pub bg: PixelColor,
 }
 
 impl Color {
@@ -41,6 +41,7 @@ pub struct Console {
     buffer: [char; 10000],
     color: Color,
     cursor: Cursor,
+    scroll_flag: bool,
 }
 
 const ROWS: usize = 25;
@@ -55,8 +56,23 @@ impl Console {
             buffer: [' '; 10000],
             color: Color::DEFAULT,
             cursor: Cursor {x: 0, y: 0},
+            scroll_flag: false,
         }
     }
+
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+    pub fn columns(&self) -> usize {
+        self.columns
+    }
+    pub fn fg(&self) -> PixelColor {
+        self.color.fg
+    }
+    pub fn bg(&self) -> PixelColor {
+        self.color.bg
+    }
+
 
     pub fn render(&mut self, writer: &dyn PixelWriter, font: &dyn Font) {
         let (font_x, font_y) = font.char_size();
@@ -64,9 +80,18 @@ impl Console {
             for x in 0..self.columns {
                 let index = y*self.columns + x;
                 let ch = self.buffer[index];
-                font.write_ascii(writer, font_x*x, font_y*y, ch, &self.color.fg);
+                use crate::graphics::Vector2D;
+                if self.scroll_flag {
+                    writer.fill_rect(
+                        Vector2D::new(x*font_x, y*font_y),
+                        Vector2D::new(font_x, font_y),
+                        &self.color.bg,
+                    );
+                }
+                font.write_ascii(writer, font_x*x, font_y*y, ch, &self.color.fg, &self.color.bg);
             }
         }
+        self.scroll_flag = false;
     }
 
     pub fn put_string(&mut self, s: &str) {
@@ -82,15 +107,41 @@ impl Console {
         });
     }
 
-    fn new_line(&mut self) {
-        self.cursor.x = 0;
-        if self.cursor.y < self.rows - 1 {
-            self.cursor.y += 1;
-        } else {
-            for row in 0..(self.rows-1) {
-                self.buffer[row] = self.buffer[row+1];
+    fn move_cursor_forward(&mut self) {
+        self.cursor.x += 1;
+        if self.cursor.x == self.columns {
+            self.cursor.x = 0;
+            if self.cursor.y + 1 == self.rows {
+                self.scroll_up();
+            } else {
+                self.cursor.y += 1;
             }
         }
+    }
+
+    fn move_cursor_backward(&mut self) {
+        if self.cursor.x > 0 {
+            self.cursor.x -= 1;
+        }
+    }
+
+    fn new_line(&mut self) {
+        self.cursor.x = 0;
+        if self.cursor.y == self.rows - 1 {
+            // スクロールの必要あり
+            self.scroll_up();
+        } else {
+            // スクロールの必要なし
+            self.cursor.y += 1;
+        }
+    }
+
+    fn scroll_up(&mut self) {
+        self.scroll_flag = true;
+        let end = self.rows * self.columns;
+        let src = self.columns..end;
+        self.buffer.copy_within(src, 0);
+        self.buffer[(end-self.columns)..end].fill(' ');
     }
 
 }
@@ -134,14 +185,15 @@ pub fn _kprint(args: fmt::Arguments) {
     let writer = WRITER.lock();
     let writer = unsafe { writer.assume_init() };
     console.write_fmt(args).unwrap();
+    use crate::graphics::Vector2D;
     console.render(writer, &CONSOLE_FONT);
 }
 
 #[no_mangle]
 pub extern "C" fn usb_log(_level: i32, msg: *const u8, msg_len: i32) {
-    // let s = unsafe { core::slice::from_raw_parts(msg, msg_len as usize) };
-    // let s = unsafe { core::str::from_utf8_unchecked(s) };
-    // kprintln!("{}", s);
+    let s = unsafe { core::slice::from_raw_parts(msg, msg_len as usize) };
+    let s = unsafe { core::str::from_utf8_unchecked(s) };
+    kprint!("{}", s);
 }
 
 // ------------------------------------------------------

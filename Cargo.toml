@@ -8,6 +8,7 @@ resolver = "2"
 
 [dependencies]
 mikanos_usb = { path = "./mikanos_usb/" }
+x86_64 = { version = "0.14" }
 
 [workspace]
 members = [

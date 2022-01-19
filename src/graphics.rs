@@ -102,7 +102,7 @@ pub trait PixelWriter {
     //     let _old_self = core::mem::replace(self, fb);
     // }
 
-    fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor);
+    fn draw_pixel(&self, x: usize, y: usize, color: &PixelColor);
 
     fn fill_rect(&self, pos: Vector2D<usize>, size: Vector2D<usize>, color: &PixelColor) {
         for dy in 0..size.y() {
@@ -169,10 +169,10 @@ impl PixelWriter for BGRResv8BitPerColorPixelWriter {
 
 pub trait Font {
     fn char_size(&self) -> (usize, usize);
-    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, color: &PixelColor); 
-    fn write_string(&self, writer: &dyn PixelWriter, x: usize, y: usize, s: &str, color: &PixelColor) {
+    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, fg: &PixelColor, bg: &PixelColor); 
+    fn write_string(&self, writer: &dyn PixelWriter, x: usize, y: usize, s: &str, fg: &PixelColor, bg: &PixelColor) {
         for (i, c) in s.chars().enumerate() {
-            self.write_ascii(writer, i*8 + x, y, c, color);
+            self.write_ascii(writer, i*8 + x, y, c, fg, bg);
         }
     }
 }
@@ -185,17 +185,21 @@ impl Font for ShinonomeFont {
     fn char_size(&self) -> (usize, usize) {
         (8+2, 16+2)
     }
-    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, color: &PixelColor) {
+    fn write_ascii(&self, writer: &dyn PixelWriter, x: usize, y: usize, c: char, fg: &PixelColor, bg: &PixelColor) {
         let index = 16*c as usize;
         // if c is not ascii char
         if index >= self.font.len() {
             return
         }
+        // writer.draw_rect(Vector2D::new(x, y), Vector2D::new(8, 16), bg);
         for dy in 0..16 {
             for dx in 0..8 {
                 if ((self.font[index+dy] << dx) & 0x80) > 0 {
-                    writer.draw_pixel(x+dx, y+dy, color);
-                }
+                    writer.draw_pixel(x+dx, y+dy, fg);
+                } 
+                // else {
+                    // writer.draw_pixel(x+dx, y+dy, bg);
+                // }
             }
         }
 
@@ -210,9 +214,9 @@ impl ShinonomeFont {
         }
     }
 
-    pub fn write_string(&self, writer: &FrameBuffer, x: usize, y: usize, s: &str, color: &PixelColor) {
+    pub fn write_string(&self, writer: &FrameBuffer, x: usize, y: usize, s: &str, fg: &PixelColor, bg: &PixelColor) {
         for (i, c) in s.chars().enumerate() {
-            self.write_ascii(writer, i*8 + x, y, c, color);
+            self.write_ascii(writer, i*8 + x, y, c, fg, bg);
         }
     }
 }

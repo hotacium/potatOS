@@ -5,4 +5,4 @@
 # `rustup override nightly` の代わり
 channel = "nightly"
 # `rustup add rust-src` 等の代わり
-# components = ["rust-src", "rustfmt", "clippy"]
+# components = ["rust-src"]
