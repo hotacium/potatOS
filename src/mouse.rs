@@ -43,16 +43,25 @@ pub enum MouseButton {
 
 
 
-pub extern "C" fn mouse_observer(buttons: u8, displacement_x: i8, displacement_y: i8) {
+pub extern "C" fn mouse_observer(dx: i8, dy: i8) {
+    // kprintln!("mouse_observer({}, {})", dx, dy);
     let mut mouse = MOUSE.lock();
-    let (x, y) = (displacement_x as usize, displacement_y as usize);
-    mouse.move_relative(x, y);
+    let (dx, dy) = (dx as isize, dy as isize);
+    mouse.move_relative(dx, dy);
 }
 
-pub static MOUSE: SpinMutex<Mouse> = SpinMutex::new(Mouse::new(200, 300));
+pub static MOUSE: SpinMutex<Mouse> = SpinMutex::new(Mouse::new());
+pub fn init_mouse() {
+    let mut mouse = MOUSE.lock();
+    mouse.init(200, 300);
+    mouse.draw();
+}
+
 pub struct Mouse {
-    x: usize,
-    y: usize,
+    x: isize,
+    y: isize,
+    max_x: isize,
+    max_y: isize,
 }
 
 use core::fmt;
@@ -64,29 +73,50 @@ impl fmt::Display for SpinMutex<Mouse> {
 }
 
 impl Mouse {
-    pub const fn new(x: usize, y: usize) -> Self {
-        Self { x, y }
+    pub const fn new() -> Self {
+        Self { x: 0, y: 0, max_x: 0, max_y: 0 }
     }
 
-    pub fn pos(&self) -> (usize, usize) {
+    pub fn init(&mut self, x: isize, y: isize) {
+        (self.x, self.y) = (x, y);
+        let writer = unsafe { WRITER.lock().assume_init() };
+        (self.max_x, self.max_y) = (writer.horizontal_resolution() as isize, writer.vertical_resolution() as isize);
+    }
+
+    pub fn pos(&self) -> (isize, isize) {
         (self.x, self.y)
     }
 
-    pub fn move_relative(&mut self, x: usize, y: usize) {
+    pub fn move_relative(&mut self, dx: isize, dy: isize) {
+        // 1. if x + self.x < 0 { self.x = 0 }
+        // 2. else if x + self.x > self.max_x { self.x = self.max_x }
+        // 3. else { self.x += x }
         self.erase();
-        self.x += x;
-        self.y += y;
+        // todo: usize でもつなら self.x + dx で負になるか事前に判定
+        self.x = match self.x + dx {
+            v if v < 0 => { 0 },
+            v if v > self.max_x => { self.max_x },
+            v => { v },
+        };
+        self.y = match self.y + dy {
+            v if v < 0 => { 0 },
+            v if v > self.max_y => { self.max_y },
+            v => { v },
+        };
         self.draw();
     }
 
+    // todo: 色を指定できるようにする
     pub fn erase(&self) {
         let writer = unsafe { WRITER.lock().assume_init() };
-        for dy in 0..MOUSE_CURSOR_SHAPE.len() {
+        for dy  in 0..MOUSE_CURSOR_SHAPE.len() {
             MOUSE_CURSOR_SHAPE[dy].chars()
                 .enumerate()
                 .for_each(|(dx, c)| {
+                    let x = self.x as usize + dx;
+                    let y = self.y as usize + dy;
                     match c {
-                        '@' | '.' => writer.draw_pixel(self.x+dx, self.y+dy, &PixelColor::WHITE),
+                        '@' | '.' => writer.draw_pixel(x, y, &PixelColor::WHITE),
                         ' ' => { /* do nothing */ },
                         c => panic!("Unexpected cursor shape: {}", c),
                     }
@@ -101,9 +131,11 @@ impl Mouse {
             MOUSE_CURSOR_SHAPE[dy].chars()
                 .enumerate()
                 .for_each(|(dx, c)| {
+                    let x = self.x as usize + dx;
+                    let y = self.y as usize + dy;
                     match c {
-                        '@' => writer.draw_pixel(self.x+dx, self.y+dy, &PixelColor::BLACK),
-                        '.' => writer.draw_pixel(self.x+dx, self.y+dy, &PixelColor::WHITE),
+                        '@' => writer.draw_pixel(x, y, &PixelColor::BLACK),
+                        '.' => writer.draw_pixel(x, y, &PixelColor::WHITE),
                         ' ' => { /* do nothing */ },
                         c => panic!("Unexpected cursor shape: {}", c),
                     }

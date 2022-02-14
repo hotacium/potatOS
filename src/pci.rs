@@ -11,7 +11,7 @@ pub struct Config {
     function: u8,
 }
 
-use crate::bit_field::BitField;
+use crate::utils::bit_field::BitField;
 impl Config {
     pub fn make_address(&self, reg_addr: u8) -> u32 {
         let mut value = 0;

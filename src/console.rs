@@ -44,7 +44,7 @@ pub struct Console {
     scroll_flag: bool,
 }
 
-const ROWS: usize = 25;
+const ROWS: usize = 10;
 const COLUMNS: usize =  80;
 
 use crate::graphics::PixelWriter;
@@ -185,7 +185,6 @@ pub fn _kprint(args: fmt::Arguments) {
     let writer = WRITER.lock();
     let writer = unsafe { writer.assume_init() };
     console.write_fmt(args).unwrap();
-    use crate::graphics::Vector2D;
     console.render(writer, &CONSOLE_FONT);
 }
 
@@ -193,7 +192,7 @@ pub fn _kprint(args: fmt::Arguments) {
 pub extern "C" fn usb_log(_level: i32, msg: *const u8, msg_len: i32) {
     let s = unsafe { core::slice::from_raw_parts(msg, msg_len as usize) };
     let s = unsafe { core::str::from_utf8_unchecked(s) };
-    kprint!("{}", s);
+    // kprint!("{}", s);
 }
 
 // ------------------------------------------------------

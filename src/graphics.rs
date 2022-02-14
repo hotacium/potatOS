@@ -45,7 +45,21 @@ use core::mem::MaybeUninit;
 pub static WRITER: SpinMutex<MaybeUninit<&dyn PixelWriter>> = SpinMutex::new(
     MaybeUninit::<&dyn PixelWriter>::uninit()
 );
-
+pub fn init_global_writer(frame_buffer: FrameBuffer) {
+    WRITER.lock().write(match frame_buffer.pixel_format() {
+        PixelFormat::PixelRGBResv8BitPerColor => {
+            // placement new
+            static mut RGB_WRITER: MaybeUninit<RGBResv8BitPerColorPixelWriter> = MaybeUninit::uninit();
+            unsafe { RGB_WRITER.write(RGBResv8BitPerColorPixelWriter::new(frame_buffer)); }
+            unsafe { RGB_WRITER.assume_init_ref() }
+        },
+        PixelFormat::PixelBGRResv8BitPerColor => {
+            static mut BGR_WRITER: MaybeUninit<BGRResv8BitPerColorPixelWriter> = MaybeUninit::uninit();
+            unsafe { BGR_WRITER.write(BGRResv8BitPerColorPixelWriter::new(frame_buffer)); }
+            unsafe { BGR_WRITER.assume_init_ref() }
+        },
+    });
+}
 
 #[derive(Debug)]
 #[repr(C)]
@@ -83,6 +97,12 @@ impl FrameBuffer {
 }
 
 impl PixelWriter for FrameBuffer {
+    fn horizontal_resolution(&self) -> usize {
+        self.h()
+    }
+    fn vertical_resolution(&self) -> usize {
+        self.v()
+    }
     fn draw_pixel(&self, x: usize, y: usize, color: &PixelColor) {
         let pixel_position = self.pixel_per_scan_line * y + x;
         let color_data = match self.pixel_format {
@@ -97,12 +117,13 @@ impl PixelWriter for FrameBuffer {
 }
 
 pub trait PixelWriter {
-    // fn new(frame_buffer: FrameBuffer) -> Self;
-    // fn init(&mut self, fb: Self) {
-    //     let _old_self = core::mem::replace(self, fb);
-    // }
-
     fn draw_pixel(&self, x: usize, y: usize, color: &PixelColor);
+
+    fn horizontal_resolution(&self) -> usize;
+    fn vertical_resolution(&self) -> usize;
+    fn resolution(&self) -> (usize, usize) {
+        (self.horizontal_resolution(), self.vertical_resolution())
+    }
 
     fn fill_rect(&self, pos: Vector2D<usize>, size: Vector2D<usize>, color: &PixelColor) {
         for dy in 0..size.y() {
@@ -135,12 +156,18 @@ impl RGBResv8BitPerColorPixelWriter {
 }
 
 impl PixelWriter for RGBResv8BitPerColorPixelWriter {
+    fn horizontal_resolution(&self) -> usize {
+        self.frame_buffer.h()
+    }
+    fn vertical_resolution(&self) -> usize {
+        self.frame_buffer.v()
+    }
     fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor) {
         let pixel_position = self.frame_buffer.pixel_per_scan_line * y + x;
         let pixel = unsafe { self.frame_buffer.frame_buffer.add(4*pixel_position) };
         let color_data = [color.red, color.green, color.blue];
-        for (i, &item) in color_data.iter().enumerate() {
-            unsafe { pixel.add(i).write_volatile(item) };
+        for (i, &val) in color_data.iter().enumerate() {
+            unsafe { pixel.add(i).write_volatile(val) };
         }
     }
 }
@@ -157,6 +184,12 @@ impl BGRResv8BitPerColorPixelWriter {
 }
 
 impl PixelWriter for BGRResv8BitPerColorPixelWriter {
+    fn horizontal_resolution(&self) -> usize {
+        self.frame_buffer.h()
+    }
+    fn vertical_resolution(&self) -> usize {
+        self.frame_buffer.v()
+    }
     fn draw_pixel(&self, x:usize, y:usize, color: &PixelColor) {
         let pixel_position = self.frame_buffer.pixel_per_scan_line * y + x;
         let pixel = unsafe { self.frame_buffer.frame_buffer.add(4*pixel_position) };

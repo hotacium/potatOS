@@ -6,7 +6,7 @@
 
 pub(crate) mod cxx_support;
 
-type MouseObserverType = extern "C" fn(buttons: u8, displacement_x: i8, displacement_y: i8);
+type MouseObserverType = extern "C" fn(displacement_x: i8, displacement_y: i8);
 type KeyboardObserverType = extern "C" fn(modifier: u8, keycode: u8);
 
 extern "C" {
@@ -62,7 +62,7 @@ pub mod xhci {
 // opaque type
 pub enum HidMouseDriver {}
 
-pub type HidMouseObserver = extern "C" fn(buttons: u8, displacement_x: i8, displacement_y: i8);
+pub type HidMouseObserver = extern "C" fn(displacement_x: i8, displacement_y: i8);
 
 impl HidMouseDriver {
     pub fn set_default_observer(observer: HidMouseObserver) {
