@@ -11,6 +11,7 @@ pub mod interrupts;
 pub mod logger;
 pub mod xhc;
 pub mod utils;
+pub mod asm;
 
 use core::panic::PanicInfo;
 // TODO: write another panic function for release build

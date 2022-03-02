@@ -3,9 +3,13 @@ use core::ops::{Bound, Range, RangeBounds};
 pub trait BitField {
     const BIT_LENGTH: usize;
 
+    #[must_use]
     fn get_bit(&self, bit: usize) -> bool;
+    #[must_use]
     fn get_bits<T: RangeBounds<usize>>(&self, range: T) -> Self;
+    #[must_use]
     fn set_bit(&mut self, bit: usize, val: bool) -> &mut Self;
+    #[must_use]
     fn set_bits<T: RangeBounds<usize>>(&mut self, range: T, val: Self) -> &mut Self;
 }
 

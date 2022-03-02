@@ -5,6 +5,7 @@
 
 
 use core::arch::asm;
+use crate::interrupts::idt::InterruptDescriptorTablePointer;
 
 
 #[inline]
@@ -22,15 +23,16 @@ pub fn hlt() {
 }
 
 #[inline]
-pub unsafe fn get_cs() -> u16 {
+pub fn get_cs() -> u16 {
     let cs: u16;
     unsafe {
-        asm!("mov {:x}" cs, out(reg) cs, options(nomem, nostack, preserves_flags))
+        asm!("mov {:x}, cs", out(reg) cs, options(nomem, nostack, preserves_flags))
     }
+    cs
 }
 
 #[inline]
-pub unsafe fn lidt(idt: &InterruptDescriptorTablePointer) {
+pub fn lidt(idt: &InterruptDescriptorTablePointer) {
     unsafe {
         asm!("lidt [{}]", in(reg) idt, options(readonly, nostack, preserves_flags));
     }

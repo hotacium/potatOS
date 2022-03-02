@@ -15,17 +15,18 @@ use potatOS::pci::{
     scan_all_bus,
     Device,
 };
+use potatOS::interrupts::idt::init_idt;
 use potatOS::xhc::{XHC_CONTROLLER, init_xhc};
 use potatOS::logger::set_log_level;
 use mikanos_usb as usb;
 use core::arch::asm;
 
 
-fn init() {
+fn init(fb: FrameBuffer) {
     set_log_level(LogLevel::Error);
-    init_global_writer(frame_buffer);
+    init_global_writer(fb);
     init_mouse();
-    // potatOS::interrupts::init_idt();
+    init_idt();
     scan_all_bus().unwrap();
     init_xhc();
     kprintln!("Welcome to potatOS!");
@@ -41,11 +42,14 @@ pub extern "C" fn kernel_main(frame_buffer: FrameBuffer) -> ! { // TODO: 引数�
     }
 
     // init 
-    init();
+    init(frame_buffer);
     // end init
 
 
-    loop { XHC_CONTROLLER.lock().as_mut().unwrap().process_event().unwrap(); }
+    // loop { XHC_CONTROLLER.lock().as_mut().unwrap().process_event().unwrap(); }
+
+    // breakpoint test
+    // x86_64::instructions::interrupts::int3();
 
     loop {
         x86_64::instructions::hlt();

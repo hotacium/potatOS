@@ -1,7 +1,8 @@
 
 use crate::sync::SpinMutex;
 use crate::pci::{self, Device};
-use crate::trace;
+use crate::{trace, interrupts};
+use crate::utils::bit_field::BitField;
 use mikanos_usb as usb;
 
 
@@ -11,6 +12,21 @@ pub static XHC_CONTROLLER: SpinMutex<Option<&'static mut usb::xhci::Controller>>
 pub fn init_xhc() {
     let xhc_dev = find_xhc_device();
     if let Some(device) = xhc_dev {
+
+        // msi の設定
+        const LOCAL_APIC_ID_REGISTER: *const u32 = 0xfee00020 as *const u32;
+        let bsp_local_apic_id = unsafe { *LOCAL_APIC_ID_REGISTER }.get_bits(24..32) as u8;
+        let is_err = device.configure_msi_fixed_destination(
+            bsp_local_apic_id, 
+            pci::MSITriggerMode::Level, 
+            pci::MSIDeliveryMode::Fixed, 
+            interrupts::idt::InterruptVector::XHCI,
+            0,
+        ).is_err();
+        if is_err {
+            panic!("msi configuration failed");
+        }
+
         let xhc_bar = device.read_bar(0);
         let mmio_base = (xhc_bar.unwrap() & !0x0f) as u64;
         let mut controller = XHC_CONTROLLER.lock();
@@ -22,18 +38,18 @@ pub fn init_xhc() {
         }
 
         controller.init();
-        trace!("xhc initialized");
+        // crate::kprintln!("xhc initialized");
         controller.run().unwrap();
 
         use crate::mouse::mouse_observer;
         usb::HidMouseDriver::set_default_observer(mouse_observer);
         controller.configure_connected_ports();
 
+
         // loop { controller.process_event().unwrap(); }
     }
 
 }
-
 
 fn find_xhc_device() -> Option<&'static Device> {
     let mut xhc_dev = None;
